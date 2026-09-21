@@ -8,7 +8,7 @@ PROJECT_ID = "vocal-seeker-508915-g3"
 DATASET_ID = "retail_demand_raw"
 
 # Project root directory
-PROJECT_ROOT = Path(_file_).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
 
@@ -68,5 +68,5 @@ def main():
     print("\nAll M5 files loaded successfully!")
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
