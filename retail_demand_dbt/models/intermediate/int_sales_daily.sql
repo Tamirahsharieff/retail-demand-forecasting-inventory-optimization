@@ -1,3 +1,5 @@
+-- Intermediate dbt model for standardized long-format daily sales data
+
 SELECT
     item_id,
     dept_id,
