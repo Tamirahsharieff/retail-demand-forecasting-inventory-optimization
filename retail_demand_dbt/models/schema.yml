@@ -1,0 +1,52 @@
+version: 2
+
+models:
+
+  - name: stg_calendar
+    description: >
+      Staging model for the M5 calendar data. Provides the calendar
+      information required to map daily sales to actual dates and
+      time-related attributes.
+
+  - name: stg_sales_daily
+    description: >
+      Staging model containing the daily sales data from the M5 dataset.
+      The source sales data is transformed into a daily sales structure
+      used by downstream intermediate models.
+
+  - name: stg_sell_prices
+    description: >
+      Staging model containing item, store, and weekly selling-price
+      information from the M5 dataset.
+
+  - name: int_sales_daily
+    description: >
+      Intermediate model that transforms the daily sales data into a
+      long-format structure with one record per item, store, and day.
+      It is used as the foundation for daily, weekly, and monthly sales
+      aggregations.
+
+  - name: int_sales_weekly
+    description: >
+      Intermediate model that aggregates daily sales into weekly sales
+      using the calendar date information.
+
+  - name: int_sales_monthly
+    description: >
+      Intermediate model that aggregates daily sales into monthly sales
+      using the calendar date information.
+
+  - name: fct_sales_daily
+    description: >
+      Final daily sales mart combining daily sales with calendar
+      attributes such as date, week, month, and year for analysis.
+
+  - name: fct_sales_weekly
+    description: >
+      Final weekly sales mart containing weekly aggregated sales by
+      item, department, category, store, and state.
+
+  - name: fct_sales_monthly
+    description: >
+      Final monthly sales mart containing monthly aggregated sales by
+      item, department, category, store, and state.
