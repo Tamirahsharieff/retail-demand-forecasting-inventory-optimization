@@ -1,45 +1,223 @@
+import os
+import pandas as pd
 import streamlit as st
-import csv
 
-# Page configuration
+# -----------------------------------
+# Page Configuration
+# -----------------------------------
 st.set_page_config(
     page_title="Retail Demand Forecasting",
+    page_icon="📊",
     layout="wide"
 )
 
-# Title
-st.title("📊 Retail Demand Forecasting & Inventory Optimization")
+# -----------------------------------
+# Dashboard Title
+# -----------------------------------
+st.title("Retail Demand Forecasting & Inventory Optimization")
 
 st.write(
-    "Interactive dashboard for viewing demand forecasts."
+    "Demand analysis and machine learning predictions "
+    "for inventory planning."
 )
 
-# Forecast file
-forecast_file = "data/processed/lightgbm_forecast_HOBBIES_1_001.csv"
+st.divider()
 
-# Read CSV without pandas
-rows = []
+# -----------------------------------
+# Load Forecast Data
+# -----------------------------------
+forecast_file = (
+    "data/processed/lightgbm_forecast_HOBBIES_1_001.csv"
+)
 
-with open(forecast_file, "r") as file:
-    reader = csv.DictReader(file)
+if not os.path.exists(forecast_file):
+    st.error("Forecast CSV file not found. Please check the file path.")
+    st.stop()
 
-    for row in reader:
-        rows.append(row)
+df = pd.read_csv(forecast_file)
+# Forecast Filters
+st.subheader("🔎 Forecast Filters")
 
-# Forecast section
-st.subheader("30-Day Demand Forecast")
+col1, col2 = st.columns(2)
 
-# Display forecast data without pandas
-if rows:
-    headers = rows[0].keys()
+with col1:
+    selected_store = st.selectbox(
+        "Select Store",
+        ["All Stores", "CA_1", "CA_2", "CA_3", "CA_4",
+         "TX_1", "TX_2", "TX_3", "WI_1", "WI_2", "WI_3"]
+    )
 
-    table = "| " + " | ".join(headers) + " |\n"
-    table += "| " + " | ".join(["---"] * len(headers)) + " |\n"
+with col2:
+    selected_category = st.selectbox(
+        "Select Category",
+        ["All Categories", "HOBBIES", "FOODS", "HOUSEHOLD"]
+    )
 
-    for row in rows[:30]:
-        table += "| " + " | ".join(str(row[h]) for h in headers) + " |\n"
+st.info(
+    f"Selected Store: {selected_store} | "
+    f"Selected Category: {selected_category}"
+)
 
-    st.markdown(table)
+required_columns = [
+    "date",
+    "actual_sales",
+    "predicted_sales"
+]
 
-else:
-    st.warning("No forecast data found.")
+if not all(column in df.columns for column in required_columns):
+    st.error("The forecast CSV is missing required columns.")
+    st.stop()
+
+df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+df["actual_sales"] = pd.to_numeric(
+    df["actual_sales"], errors="coerce"
+)
+
+df["predicted_sales"] = pd.to_numeric(
+    df["predicted_sales"], errors="coerce"
+)
+
+df = df.dropna(subset=required_columns)
+df = df.sort_values("date")
+
+if df.empty:
+    st.error("No valid forecast records are available.")
+    st.stop()
+    # Apply store and category filters
+if selected_store != "All Stores" or selected_category != "All Categories":
+    st.warning(
+        "These filters are currently selections only. "
+        "The loaded forecast CSV contains one item-level forecast, "
+        "so store/category filtering requires matching store-level data."
+    )
+
+# -----------------------------------
+# Calculate Evaluation Metrics
+# -----------------------------------
+mae = (
+    df["actual_sales"] - df["predicted_sales"]
+).abs().mean()
+
+rmse = (
+    (df["actual_sales"] - df["predicted_sales"]) ** 2
+).mean() ** 0.5
+
+# -----------------------------------
+# Forecast Overview
+# -----------------------------------
+st.header("📌 Forecast Overview")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        label="Total Records",
+        value=f"{len(df):,}"
+    )
+
+with col2:
+    st.metric(
+        label="Mean Absolute Error (MAE)",
+        value=f"{mae:.4f}"
+    )
+
+with col3:
+    st.metric(
+        label="Root Mean Squared Error (RMSE)",
+        value=f"{rmse:.4f}"
+    )
+
+st.caption(
+    "Lower MAE and RMSE generally indicate more accurate predictions."
+)
+
+st.divider()
+
+# -----------------------------------
+# Prepare Daily Chart Data
+# -----------------------------------
+chart_data = (
+    df.groupby("date")[
+        ["actual_sales", "predicted_sales"]
+    ]
+    .mean()
+    .sort_index()
+)
+
+# -----------------------------------
+# Actual vs Predicted Sales
+# -----------------------------------
+st.subheader("📈 Actual vs Predicted Sales")
+
+st.line_chart(
+    chart_data.tail(90),
+    height=420
+)
+
+st.caption(
+    "Comparison of actual sales and LightGBM predictions "
+    "over the most recent 90 days."
+)
+
+st.divider()
+
+# -----------------------------------
+# Demand Forecast Trend
+# -----------------------------------
+st.header("📉 Demand Forecast Trend")
+
+st.line_chart(
+    chart_data[["predicted_sales"]].tail(90),
+    height=350
+)
+
+st.caption(
+    "Daily average predicted sales over the most recent 90 days."
+)
+
+st.divider()
+
+# -----------------------------------
+# Forecast Data Preview
+# -----------------------------------
+st.header("📋 Forecast Data")
+
+st.write("Preview of the first 30 records:")
+
+display_df = df.copy()
+display_df["date"] = display_df["date"].dt.strftime("%Y-%m-%d")
+
+st.dataframe(
+    display_df.head(30).rename(
+        columns={
+            "date": "Date",
+            "actual_sales": "Actual Sales",
+            "predicted_sales": "Predicted Sales"
+        }
+    ),
+    use_container_width="stretch",
+    hide_index=True
+)
+
+# -----------------------------------
+# Download Forecast CSV
+# -----------------------------------
+csv_data = df.to_csv(index=False).encode("utf-8")
+
+st.download_button(
+    label="📥 Download Forecast CSV",
+    data=csv_data,
+    file_name="lightgbm_demand_forecast.csv",
+    mime="text/csv"
+)
+
+# -----------------------------------
+# Footer
+# -----------------------------------
+st.divider()
+
+st.caption(
+    "Retail Demand Forecasting & Inventory Optimization | "
+    "Powered by LightGBM and Streamlit"
+)
