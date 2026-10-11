@@ -42,3 +42,5 @@ src/utils/    -> helper/utility functions
 sql/          -> SQL queries
 notebooks/    -> exploration and analysis notebooks
 outputs/      -> results, reports, and visualizations
+
+ "`n## Week 2 Progress - Day 4-6`n- Completed and validated the int_sales_daily dbt model.`n- Verified daily sales data transformation from staging to intermediate model.`n"
