@@ -1,223 +1,417 @@
-import os
+import math
+
 import pandas as pd
 import streamlit as st
+from google.cloud import bigquery
 
-# -----------------------------------
-# Page Configuration
-# -----------------------------------
+
+# --------------------------------------------------
+# Page settings
+# --------------------------------------------------
 st.set_page_config(
     page_title="Retail Demand Forecasting",
     page_icon="📊",
     layout="wide"
 )
 
-# -----------------------------------
-# Dashboard Title
-# -----------------------------------
-st.title("Retail Demand Forecasting & Inventory Optimization")
+
+# --------------------------------------------------
+# BigQuery configuration - TAMIRAH'S PROJECT
+# --------------------------------------------------
+PROJECT_ID = "vocal-seeker-508915-g3"
+
+TABLE_ID = (
+    "vocal-seeker-508915-g3."
+    "m5_retail.lightgbm_forecast"
+)
+
+
+# --------------------------------------------------
+# Dashboard title
+# --------------------------------------------------
+st.title("📊 Retail Demand Forecasting & Inventory Optimization")
 
 st.write(
-    "Demand analysis and machine learning predictions "
-    "for inventory planning."
+    "Interactive dashboard to analyze retail sales, "
+    "compare LightGBM predictions, simulate pricing scenarios, "
+    "and estimate inventory requirements."
 )
 
-st.divider()
 
-# -----------------------------------
-# Load Forecast Data
-# -----------------------------------
-forecast_file = (
-    "data/processed/lightgbm_forecast_HOBBIES_1_001.csv"
-)
+# --------------------------------------------------
+# Load forecast data from BigQuery
+# --------------------------------------------------
+@st.cache_data(ttl=300)
+def load_forecast_data():
+    client = bigquery.Client(project=PROJECT_ID)
 
-if not os.path.exists(forecast_file):
-    st.error("Forecast CSV file not found. Please check the file path.")
-    st.stop()
+    query = f"""
+        SELECT
+            date,
+            SUM(actual_sales) AS actual_sales,
+            SUM(predicted_sales) AS predicted_sales
+        FROM {TABLE_ID}
+        WHERE date IS NOT NULL
+        GROUP BY date
+        ORDER BY date
+    """
 
-df = pd.read_csv(forecast_file)
-# Forecast Filters
-st.subheader("🔎 Forecast Filters")
+    df = client.query(query).to_dataframe()
 
-col1, col2 = st.columns(2)
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
 
-with col1:
-    selected_store = st.selectbox(
-        "Select Store",
-        ["All Stores", "CA_1", "CA_2", "CA_3", "CA_4",
-         "TX_1", "TX_2", "TX_3", "WI_1", "WI_2", "WI_3"]
+    return df
+
+
+# --------------------------------------------------
+# Handle BigQuery errors
+# --------------------------------------------------
+try:
+    df = load_forecast_data()
+
+except Exception as e:
+    st.error("Unable to load forecast data from BigQuery.")
+    st.error(str(e))
+    st.info(
+        "Check your Google Cloud authentication, project ID, "
+        "dataset, table, and permissions."
     )
-
-with col2:
-    selected_category = st.selectbox(
-        "Select Category",
-        ["All Categories", "HOBBIES", "FOODS", "HOUSEHOLD"]
-    )
-
-st.info(
-    f"Selected Store: {selected_store} | "
-    f"Selected Category: {selected_category}"
-)
-
-required_columns = [
-    "date",
-    "actual_sales",
-    "predicted_sales"
-]
-
-if not all(column in df.columns for column in required_columns):
-    st.error("The forecast CSV is missing required columns.")
     st.stop()
-
-df["date"] = pd.to_datetime(df["date"], errors="coerce")
-
-df["actual_sales"] = pd.to_numeric(
-    df["actual_sales"], errors="coerce"
-)
-
-df["predicted_sales"] = pd.to_numeric(
-    df["predicted_sales"], errors="coerce"
-)
-
-df = df.dropna(subset=required_columns)
-df = df.sort_values("date")
 
 if df.empty:
-    st.error("No valid forecast records are available.")
+    st.warning("No forecast data found in BigQuery.")
     st.stop()
-    # Apply store and category filters
-if selected_store != "All Stores" or selected_category != "All Categories":
-    st.warning(
-        "These filters are currently selections only. "
-        "The loaded forecast CSV contains one item-level forecast, "
-        "so store/category filtering requires matching store-level data."
-    )
 
-# -----------------------------------
-# Calculate Evaluation Metrics
-# -----------------------------------
+st.success("Forecast data loaded successfully from BigQuery!")
+
+
+# --------------------------------------------------
+# Sidebar filters
+# --------------------------------------------------
+st.sidebar.header("Dashboard Filters")
+
+if st.sidebar.button("🔄 Refresh BigQuery Data"):
+    load_forecast_data.clear()
+    st.rerun()
+
+st.sidebar.subheader("Date Range Filter")
+
+min_date = df["date"].min().date()
+max_date = df["date"].max().date()
+
+selected_dates = st.sidebar.date_input(
+    "Select date range",
+    value=(min_date, max_date),
+    min_value=min_date,
+    max_value=max_date
+)
+
+filtered_df = df.copy()
+
+if isinstance(selected_dates, (tuple, list)):
+    if len(selected_dates) == 2:
+        start_date, end_date = selected_dates
+
+        filtered_df = filtered_df[
+            (filtered_df["date"].dt.date >= start_date)
+            & (filtered_df["date"].dt.date <= end_date)
+        ]
+
+if filtered_df.empty:
+    st.warning("No records found for the selected date range.")
+    st.stop()
+
+
+# --------------------------------------------------
+# Display options
+# --------------------------------------------------
+st.sidebar.subheader("Display Options")
+
+max_records = min(100, len(filtered_df))
+default_records = min(10, max_records)
+
+record_limit = st.sidebar.slider(
+    "Number of records to display",
+    min_value=1,
+    max_value=max_records,
+    value=default_records
+)
+
+st.sidebar.caption(
+    "The table and chart display the most recent "
+    "records in the selected date range."
+)
+
+display_df = (
+    filtered_df
+    .sort_values("date")
+    .tail(record_limit)
+    .copy()
+)
+
+
+# --------------------------------------------------
+# Sales summary
+# --------------------------------------------------
+st.subheader("📌 Sales Summary")
+
+actual_total = filtered_df["actual_sales"].sum()
+predicted_total = filtered_df["predicted_sales"].sum()
+
 mae = (
-    df["actual_sales"] - df["predicted_sales"]
-).abs().mean()
-
-rmse = (
-    (df["actual_sales"] - df["predicted_sales"]) ** 2
-).mean() ** 0.5
-
-# -----------------------------------
-# Forecast Overview
-# -----------------------------------
-st.header("📌 Forecast Overview")
+    filtered_df["actual_sales"]
+    .sub(filtered_df["predicted_sales"])
+    .abs()
+    .mean()
+)
 
 col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.metric(
-        label="Total Records",
-        value=f"{len(df):,}"
-    )
-
-with col2:
-    st.metric(
-        label="Mean Absolute Error (MAE)",
-        value=f"{mae:.4f}"
-    )
-
-with col3:
-    st.metric(
-        label="Root Mean Squared Error (RMSE)",
-        value=f"{rmse:.4f}"
-    )
-
-st.caption(
-    "Lower MAE and RMSE generally indicate more accurate predictions."
+col1.metric(
+    "Total Actual Sales",
+    f"{actual_total:,.0f}"
 )
 
-st.divider()
-
-# -----------------------------------
-# Prepare Daily Chart Data
-# -----------------------------------
-chart_data = (
-    df.groupby("date")[
-        ["actual_sales", "predicted_sales"]
-    ]
-    .mean()
-    .sort_index()
+col2.metric(
+    "Total Predicted Sales",
+    f"{predicted_total:,.2f}"
 )
 
-# -----------------------------------
-# Actual vs Predicted Sales
-# -----------------------------------
-st.subheader("📈 Actual vs Predicted Sales")
-
-st.line_chart(
-    chart_data.tail(90),
-    height=420
+col3.metric(
+    "Mean Absolute Error (MAE)",
+    f"{mae:.4f}"
 )
 
 st.caption(
-    "Comparison of actual sales and LightGBM predictions "
-    "over the most recent 90 days."
+    "MAE is the average absolute difference between actual "
+    "and predicted daily sales. Lower values indicate "
+    "smaller prediction errors."
 )
 
-st.divider()
 
-# -----------------------------------
-# Demand Forecast Trend
-# -----------------------------------
-st.header("📉 Demand Forecast Trend")
-
-st.line_chart(
-    chart_data[["predicted_sales"]].tail(90),
-    height=350
-)
-
-st.caption(
-    "Daily average predicted sales over the most recent 90 days."
-)
-
-st.divider()
-
-# -----------------------------------
-# Forecast Data Preview
-# -----------------------------------
-st.header("📋 Forecast Data")
-
-st.write("Preview of the first 30 records:")
-
-display_df = df.copy()
-display_df["date"] = display_df["date"].dt.strftime("%Y-%m-%d")
+# --------------------------------------------------
+# Demand forecast table
+# --------------------------------------------------
+st.subheader("📋 Demand Forecast")
 
 st.dataframe(
-    display_df.head(30).rename(
-        columns={
-            "date": "Date",
-            "actual_sales": "Actual Sales",
-            "predicted_sales": "Predicted Sales"
-        }
-    ),
-    use_container_width="stretch",
+    display_df,
+    width="stretch",
     hide_index=True
 )
 
-# -----------------------------------
-# Download Forecast CSV
-# -----------------------------------
-csv_data = df.to_csv(index=False).encode("utf-8")
+
+# --------------------------------------------------
+# Actual vs predicted chart
+# --------------------------------------------------
+st.subheader("📈 Actual vs Predicted Sales")
+
+chart_data = display_df.set_index("date")[
+    ["actual_sales", "predicted_sales"]
+]
+
+st.line_chart(chart_data, width="stretch")
+
+
+# --------------------------------------------------
+# What-if price scenario
+# --------------------------------------------------
+st.divider()
+
+st.subheader("💰 What-If Price Scenario")
+
+st.write(
+    "Estimate how a price reduction could affect demand. "
+    "This is an assumption-based simulation, not a model "
+    "trained on historical price-response data."
+)
+
+scenario_col1, scenario_col2 = st.columns(2)
+
+with scenario_col1:
+    price_reduction = st.slider(
+        "Simulated price reduction (%)",
+        min_value=0,
+        max_value=30,
+        value=10,
+        step=1
+    )
+
+with scenario_col2:
+    elasticity = st.slider(
+        "Assumed demand elasticity",
+        min_value=0.0,
+        max_value=3.0,
+        value=1.5,
+        step=0.1
+    )
+
+baseline_demand = max(
+    0.0,
+    float(filtered_df["predicted_sales"].mean())
+)
+
+demand_increase_pct = (price_reduction / 100) * elasticity
+
+scenario_demand = baseline_demand * (1 + demand_increase_pct)
+
+additional_units = scenario_demand - baseline_demand
+
+price_col1, price_col2, price_col3 = st.columns(3)
+
+price_col1.metric(
+    "Baseline Average Daily Demand",
+    f"{baseline_demand:.2f} units"
+)
+
+price_col2.metric(
+    "Scenario Daily Demand",
+    f"{scenario_demand:.2f} units",
+    delta=f"{demand_increase_pct * 100:.1f}%"
+)
+
+price_col3.metric(
+    "Estimated Additional Units/Day",
+    f"{additional_units:.2f}"
+)
+
+st.caption(
+    "Assumption: a price reduction increases demand according "
+    "to the selected elasticity. Actual demand may differ."
+)
+
+
+# --------------------------------------------------
+# Inventory optimization
+# --------------------------------------------------
+st.divider()
+
+st.subheader("📦 Inventory Optimization")
+
+st.write(
+    "Estimate target stock and suggested reorder quantity "
+    "using predicted demand, supplier lead time, and safety stock."
+)
+
+inventory_col1, inventory_col2, inventory_col3 = st.columns(3)
+
+with inventory_col1:
+    current_stock = st.number_input(
+        "Current inventory (units)",
+        min_value=0,
+        value=0,
+        step=1
+    )
+
+with inventory_col2:
+    lead_time = st.number_input(
+        "Supplier lead time (days)",
+        min_value=1,
+        value=7,
+        step=1
+    )
+
+with inventory_col3:
+    safety_days = st.number_input(
+        "Safety stock (days of demand)",
+        min_value=0,
+        value=3,
+        step=1
+    )
+
+average_daily_demand = scenario_demand
+
+lead_time_demand = average_daily_demand * lead_time
+
+target_stock = math.ceil(
+    average_daily_demand * (lead_time + safety_days)
+)
+
+suggested_reorder = max(
+    0,
+    target_stock - int(current_stock)
+)
+
+inv_col1, inv_col2, inv_col3, inv_col4 = st.columns(4)
+
+inv_col1.metric(
+    "Average Daily Demand",
+    f"{average_daily_demand:.2f}"
+)
+
+inv_col2.metric(
+    "Lead-Time Demand",
+    f"{lead_time_demand:.2f}"
+)
+
+inv_col3.metric(
+    "Target Stock",
+    f"{target_stock} units"
+)
+
+inv_col4.metric(
+    "Suggested Reorder",
+    f"{suggested_reorder} units"
+)
+
+if suggested_reorder > 0:
+    st.warning(
+        f"Estimated replenishment needed: "
+        f"{suggested_reorder} units."
+    )
+else:
+    st.success(
+        "Current stock meets or exceeds the estimated target stock."
+    )
+
+st.caption(
+    "Planning estimate: target stock equals scenario demand "
+    "per day multiplied by lead time plus safety-stock days. "
+    "The estimate does not account for existing purchase orders, "
+    "supplier constraints, or minimum order quantities."
+)
+
+
+# --------------------------------------------------
+# Export results
+# --------------------------------------------------
+st.divider()
+
+st.subheader("📥 Export Forecast Results")
+
+export_df = display_df.copy()
+
+export_df["scenario_daily_demand"] = scenario_demand
+export_df["price_reduction_pct"] = price_reduction
+export_df["assumed_elasticity"] = elasticity
+export_df["target_stock_units"] = target_stock
+export_df["current_stock_units"] = int(current_stock)
+export_df["suggested_reorder_units"] = suggested_reorder
+
+csv_data = export_df.to_csv(index=False).encode("utf-8")
 
 st.download_button(
-    label="📥 Download Forecast CSV",
+    label="⬇️ Download Forecast and Inventory CSV",
     data=csv_data,
-    file_name="lightgbm_demand_forecast.csv",
+    file_name="tamirah_retail_forecast_inventory.csv",
     mime="text/csv"
 )
 
-# -----------------------------------
+st.info(
+    "This dashboard reads forecast records from BigQuery. "
+    "The date filter selects records already stored in the table. "
+    "Genuine future-demand forecasts must be generated and "
+    "stored for future dates before they can appear here."
+)
+
+
+# --------------------------------------------------
 # Footer
-# -----------------------------------
+# --------------------------------------------------
 st.divider()
 
 st.caption(
     "Retail Demand Forecasting & Inventory Optimization | "
-    "Powered by LightGBM and Streamlit"
+    "Powered by LightGBM, BigQuery and Streamlit"
 )
