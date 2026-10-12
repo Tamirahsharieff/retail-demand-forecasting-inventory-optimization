@@ -44,3 +44,45 @@ notebooks/    -> exploration and analysis notebooks
 outputs/      -> results, reports, and visualizations
 
  "`n## Week 2 Progress - Day 4-6`n- Completed and validated the int_sales_daily dbt model.`n- Verified daily sales data transformation from staging to intermediate model.`n"
+
+ Week 4: Interactive Dashboard & Reporting
+
+Project Overview
+
+Developed an interactive web dashboard using Streamlit to visualize retail demand forecasts and support inventory planning. The dashboard retrieves forecasting results from Google BigQuery.
+
+Features Implemented
+
+- BigQuery Integration: Loads actual sales and LightGBM predictions from the "m5_retail.lightgbm_forecast" table.
+- Sales Summary: Displays total actual sales, total predicted sales, and Mean Absolute Error (MAE).
+- Date Range Filter: Allows users to analyze forecasts within a selected date range.
+- Demand Forecast Visualization: Displays forecast records in a table and compares actual sales with predicted sales using a line chart.
+- What-If Price Scenario: Simulates the potential demand impact of a price reduction using an adjustable assumed demand elasticity.
+- Inventory Optimization: Estimates target stock and suggested reorder quantities using predicted demand, supplier lead time, and safety-stock requirements.
+- CSV Export: Allows users to download forecast results and inventory planning estimates.
+
+Technologies Used
+
+- Python
+- Streamlit
+- Pandas
+- Google BigQuery
+- LightGBM
+
+How to Run the Dashboard
+
+1. Activate the project's Python virtual environment.
+
+2. Install the required dependencies from "requirements.txt".
+
+3. Configure Google Cloud authentication and BigQuery permissions.
+
+4. Run the application:
+   
+   "streamlit run app.py"
+
+5. Open the local URL displayed in the terminal.
+
+Notes
+
+The price scenario and inventory calculations are planning estimates based on user-selected assumptions. They are not guarantees of actual demand or stock requirements. The dashboard displays forecast records already stored in BigQuery; future forecasts must be generated and stored separately.
