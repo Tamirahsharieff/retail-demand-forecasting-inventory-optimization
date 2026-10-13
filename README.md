@@ -86,3 +86,11 @@ How to Run the Dashboard
 Notes
 
 The price scenario and inventory calculations are planning estimates based on user-selected assumptions. They are not guarantees of actual demand or stock requirements. The dashboard displays forecast records already stored in BigQuery; future forecasts must be generated and stored separately.
+
+How to Run the Dashboard
+
+1. Activate the Python virtual environment.
+2. Install the required dependencies using "pip install -r requirements.txt".
+3. Start the Streamlit application using "streamlit run app.py".
+4. Open the local URL displayed in the terminal.
+5. Ensure Google Cloud authentication is configured to access BigQuery.
