@@ -70,3 +70,13 @@ Google Cloud authentication and BigQuery permissions are required.
 8. Handover Status
 
 The forecasting pipeline, BigQuery forecast storage, and interactive dashboard have been implemented. Final review includes confirming that the latest code is pushed to GitHub, checking access permissions, and verifying the dashboard's outputs.
+
+Project Deliverables
+
+- Raw retail dataset and data preparation workflow.
+- BigQuery tables for retail sales and forecast results.
+- dbt staging, intermediate, and mart models.
+- Prophet and LightGBM forecasting scripts.
+- Streamlit dashboard for sales analysis.
+- Inventory optimization and reorder estimation features.
+- Project documentation and setup instructions.
