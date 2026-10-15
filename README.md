@@ -94,3 +94,13 @@ How to Run the Dashboard
 3. Start the Streamlit application using "streamlit run app.py".
 4. Open the local URL displayed in the terminal.
 5. Ensure Google Cloud authentication is configured to access BigQuery.
+
+Project Workflow
+
+1. Collect and prepare the M5 retail sales dataset.
+2. Load raw data into Google BigQuery.
+3. Transform and organize data using dbt.
+4. Build demand forecasting models using Prophet and LightGBM.
+5. Store forecast results in BigQuery.
+6. Visualize sales trends through the Streamlit dashboard.
+7. Use demand estimates to support inventory planning.
