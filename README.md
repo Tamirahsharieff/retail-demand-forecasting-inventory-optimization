@@ -104,3 +104,29 @@ Project Workflow
 5. Store forecast results in BigQuery.
 6. Visualize sales trends through the Streamlit dashboard.
 7. Use demand estimates to support inventory planning.
+
+📊 Dashboard Screenshots
+
+1. Dashboard Overview
+
+"Dashboard Overview" (Retail%20Demand%20Forecasting%20dashboard%201.png)
+
+2. Sales Summary and Forecast
+
+"Sales Summary and Forecast" (Retail%20Demand%20Forecasting%20dashboard%202.png)
+
+3. Actual vs Predicted Sales
+
+"Actual vs Predicted Sales" (Retail%20Demand%20Forecasting%20dashboard%203.png)
+
+4. What-If Price Scenario
+
+"What-If Price Scenario" (Retail%20Demand%20Forecasting%20dashboard%204.png)
+
+5. Inventory Optimization
+
+"Inventory Optimization" (Retail%20Demand%20Forecasting%20dashboard%205.png)
+
+6. Forecast Export
+
+"Forecast Export" (Retail%20Demand%20Forecasting%20dashboard%206.png)
